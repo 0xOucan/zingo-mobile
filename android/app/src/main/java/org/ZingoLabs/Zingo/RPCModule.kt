@@ -556,6 +556,25 @@ class RPCModule internal constructor(private val reactContext: ReactApplicationC
 }
 
     @ReactMethod
+    fun restoreWalletFromSigner(ufvk: String, birthday: String, seedfingerprint: String, account: String, serveruri: String, chainhint: String, performancelevel: String, minconfirmations: String, promise: Promise) {
+        FfiOutcome.settling(promise, "init_from_ufvk_with_derivation") {
+            uniffi.zingo.initLogging()
+            val signer = LeekSigner(seedfingerprint.hexToBytes(), account.toUInt(), ufvk, LeekSigner.network(chainhint))
+            val resp = uniffi.zingo.initFromUfvkWithDerivation(
+                ufvk = ufvk,
+                birthday = birthday.toUInt(),
+                seedFingerprint = signer.seedFingerprint,
+                accountId = signer.index,
+                connection = connection(serveruri, chainhint, performancelevel, minconfirmations),
+            )
+            LeekSigner.write(applicationContext, signer)
+            walletFileClosed = false
+            saveWalletFile()
+            resp
+        }
+    }
+
+    @ReactMethod
     fun loadExistingWallet(serveruri: String, chainhint: String, performancelevel: String, minconfirmations: String, promise: Promise) {
         FfiOutcome.settling(promise, "init_from_bytes") {
             loadExistingWalletNative(serveruri, chainhint, performancelevel, minconfirmations)
@@ -678,6 +697,7 @@ class RPCModule internal constructor(private val reactContext: ReactApplicationC
             if (!fileExists(WalletFileName.value)) {
                 walletFileClosed = true
                 deleteWalletSidecars(WalletFileName.value)
+                LeekSigner.delete(applicationContext)
                 File(applicationContext.filesDir, "${WalletTempSwapFileName.value}.plain.tmp").delete()
             }
             gone
