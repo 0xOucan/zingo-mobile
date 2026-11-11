@@ -19,6 +19,7 @@ export const Route = {
   OpenError: 'OpenError',
   Server: 'Server',
   ServerList: 'ServerList',
+  LeekImport: 'LeekImport',
 
   // Drawer no params
   Home: 'Home',
@@ -47,6 +48,7 @@ export const Route = {
   MigrationStrategy: 'MigrationStrategy',
   MigrationTransactions: 'MigrationTransactions',
   MigrationSending: 'MigrationSending',
+  LeekSign: 'LeekSign',
 
   // Drawer with params
   AddressBook: 'AddressBook',

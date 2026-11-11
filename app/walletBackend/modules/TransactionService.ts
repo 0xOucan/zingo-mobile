@@ -21,6 +21,7 @@ import { toFfiError } from '@app/walletBackend/ffi';
 import { SyncCoordinator } from './SyncCoordinator';
 import { withSyncStopped } from '@app/walletBackend/utils/syncBracket';
 import { Buffer } from 'buffer';
+import { isBoardWallet, requestBoardSignature } from '@app/leek/boardWallet';
 
 // What a swap deposit needs: where, how much, and the memo or source address
 // rule that decides its shape.
@@ -94,7 +95,9 @@ export class TransactionService {
             }
             if (!sendError) {
               stored = false;
-              const sendStr: string = await RPCModule.confirmProcess();
+              const sendStr: string = isBoardWallet()
+                ? await requestBoardSignature()
+                : await RPCModule.confirmProcess();
               if (!sendStr) {
                 console.log('Internal Error confirm');
                 sendError = 'Error: Internal RPC Error: confirm';

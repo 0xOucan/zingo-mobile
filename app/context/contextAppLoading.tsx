@@ -79,6 +79,7 @@ export const defaultAppContextLoading: AppContextLoading = {
   serverUnreachable: () => {},
   serversFor: () => [],
   doRestore: async () => {},
+  doRestoreSigner: async () => {},
 };
 
 export const ContextAppLoading = React.createContext(defaultAppContextLoading);

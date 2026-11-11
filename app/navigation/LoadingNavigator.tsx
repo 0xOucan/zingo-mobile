@@ -8,6 +8,7 @@ import { ScreenSafeArea } from './screenLayout';
 import {
   ImportChooserScreen,
   ImportWalletScreen,
+  LeekImportScreen,
   OpenErrorScreen,
   ProgressScreen,
   ServerListScreen,
@@ -63,6 +64,7 @@ function OnboardingSection() {
         name={Route.ImportWallet}
         component={ImportWalletScreen}
       />
+      <Onboarding.Screen name={Route.LeekImport} component={LeekImportScreen} />
     </Onboarding.Navigator>
   );
 }

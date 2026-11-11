@@ -34,6 +34,17 @@ interface RPCModuleAPI {
     performanceLevel: string,
     minConfirmations: string,
   ): Promise<string>;
+  // Android only: a UFVK with the ZIP 32 derivation of the LeekWallet board that signs for it.
+  restoreWalletFromSigner(
+    ufvk: string,
+    birthday: string,
+    seedFingerprint: string,
+    account: string,
+    serverUri: string,
+    chainHint: string,
+    performanceLevel: string,
+    minConfirmations: string,
+  ): Promise<string>;
   loadExistingWallet(
     serverUri: string,
     chainHint: string,

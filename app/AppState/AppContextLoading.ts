@@ -12,6 +12,7 @@ import { RPCPerformanceLevelEnum } from '@app/walletBackend/enums/RPCPerformance
 import { BlockExplorerEnum } from './enums/BlockExplorerEnum';
 import { ChainNameEnum } from './enums/ChainNameEnum';
 import type { WalletType } from '@app/wallet/types';
+import type { SignerDerivation } from '@app/walletBackend';
 import type { WalletErrorInfo } from '@app/wallet/types';
 import { ServerStatus } from './types/ServerStatus';
 import ServerUrisType from './types/ServerUrisType';
@@ -95,4 +96,9 @@ export interface OnboardingContext {
   serverUnreachable: () => void;
   serversFor: (chain: ChainNameEnum) => ServerUrisType[];
   doRestore: (seedUfvk: string, birthday: number) => Promise<void>;
+  doRestoreSigner: (
+    ufvk: string,
+    birthday: number,
+    signer: SignerDerivation,
+  ) => Promise<void>;
 }

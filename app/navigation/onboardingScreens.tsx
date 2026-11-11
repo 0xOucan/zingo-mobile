@@ -1,4 +1,5 @@
 import React, { useContext } from 'react';
+import { Platform } from 'react-native';
 
 import { Route, SelectServerEnum } from '@app/AppState';
 import { ContextAppLoading } from '@app/context';
@@ -14,6 +15,7 @@ import WalletProgress from '@screens/WalletProgress';
 import WalletError from '@screens/WalletError';
 import Server from '@screens/Server';
 import ServerList from '@screens/ServerList';
+import { LeekImport } from '@screens/LeekQr';
 
 // The onboarding routes: each one dresses its screen from the loading
 // context and the route's params.
@@ -182,6 +184,31 @@ export function ServerListScreen({
 export function ImportWalletScreen() {
   const { busy, doRestore } = useContext(ContextAppLoading);
   return (
-    <ImportUfvk busy={busy} onClickOK={doRestore} onClickCancel={goBack} />
+    <ImportUfvk
+      busy={busy}
+      onClickOK={doRestore}
+      onClickCancel={goBack}
+      onLeek={
+        Platform.OS === 'android'
+          ? () => navigateOnboarding({ screen: Route.LeekImport })
+          : undefined
+      }
+    />
+  );
+}
+
+export function LeekImportScreen() {
+  const { busy, doRestoreSigner } = useContext(ContextAppLoading);
+  return (
+    <LeekImport
+      busy={busy}
+      onImport={(account, seedFingerprint, birthday) =>
+        doRestoreSigner(account.ufvk, birthday, {
+          seedFingerprint,
+          account: account.index,
+        })
+      }
+      onBack={goBack}
+    />
   );
 }

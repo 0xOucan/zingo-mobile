@@ -139,6 +139,36 @@ export async function restoreWalletFromUfvk(
   );
 }
 
+/** The seed fingerprint (hex) and ZIP 32 account index a hardware signer derives at. */
+export type SignerDerivation = {
+  seedFingerprint: string;
+  account: number;
+};
+
+// Reconstructs a watch-only wallet whose spends a LeekWallet board signs.
+export async function restoreWalletFromSigner(
+  ufvk: string,
+  birthday: string,
+  signer: SignerDerivation,
+  serverUri: string,
+  chainHint: string,
+  performanceLevel: string,
+  minConfirmations: string,
+): Promise<FfiResult<string>> {
+  return callFfi(
+    RPCModule.restoreWalletFromSigner(
+      ufvk,
+      birthday,
+      signer.seedFingerprint,
+      String(signer.account),
+      serverUri,
+      chainHint,
+      performanceLevel,
+      minConfirmations,
+    ),
+  );
+}
+
 // Loads the wallet file already on disk against the given server/chain.
 export async function loadExistingWallet(
   serverUri: string,

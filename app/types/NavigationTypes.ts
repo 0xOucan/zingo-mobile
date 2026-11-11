@@ -51,6 +51,7 @@ export type OnboardingParamList = {
   [Route.ServerList]: { chain: ChainNameEnum };
   [Route.Progress]: { kind: 'import' | 'create' };
   [Route.OpenError]: undefined;
+  [Route.LeekImport]: undefined;
 };
 
 export type OnboardingRoute = keyof OnboardingParamList;
@@ -125,6 +126,7 @@ export type AppDrawerParamList = {
   // The immediate drain broadcasts here; `transactions` is the previewed plan,
   // so the list matches what the user accepted while the drain re-plans/sends.
   [Route.MigrationSending]: { transactions: RPCDrainTxType[] };
+  [Route.LeekSign]: undefined;
 
   // Drawer with params
   [Route.AddressBook]: AddressBookNavigationState | undefined;

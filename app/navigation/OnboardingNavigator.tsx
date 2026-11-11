@@ -29,6 +29,7 @@ const STEPS_WITH_BACK: string[] = [
   Route.ServerList,
   Route.ImportChooser,
   Route.ImportWallet,
+  Route.LeekImport,
 ];
 
 // The stage draws every transition itself, so a screen has no options.

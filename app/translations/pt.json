@@ -1598,5 +1598,25 @@
     "message": "Ocorreu um erro inesperado. Reinicie o aplicativo.",
     "report": "Relatar",
     "restart": "Reiniciar"
+  },
+  "leek": {
+    "import-title": "LeekWallet (QR)",
+    "import-entry": "Import LeekWallet (QR)",
+    "import-hint": "On the board: Main menu → View key. Point the camera at the board's animated code.",
+    "import-account": "Account {index}",
+    "import-fingerprint": "Seed fingerprint {fp}…",
+    "import-empty": "The board's code holds no account.",
+    "import-ok": "Import",
+    "scan-waiting": "Looking for the board's code…",
+    "scan-again": "Scan again",
+    "sign-building": "Building the transaction for the board…",
+    "sign-show-hint": "On the board: Scan. Hold the phone about 30 cm away and push the knob for 3x. Review and approve on the board.",
+    "sign-scan": "Scan the board's reply",
+    "sign-scan-hint": "Point the camera at the signature code the board shows.",
+    "sign-finishing": "Checking the signatures, proving and sending…",
+    "sign-close": "Close",
+    "preset-big": "Big codes",
+    "preset-medium": "40 B",
+    "preset-laptop": "50 B"
   }
 }

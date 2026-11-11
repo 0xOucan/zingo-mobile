@@ -8,6 +8,7 @@ import {
 
 import { Route } from '@app/AppState';
 import { ContextAppLoaded, useSwapService } from '@app/context';
+import { useBoardWallet } from '@app/leek/boardWallet';
 import { AppDrawerParamList, HomeTabParamList } from '@app/types';
 import CustomTabBar from './CustomTabBar';
 import { skipExitingWithScreen } from './screenLayout';
@@ -27,6 +28,7 @@ import { MessageList } from '@screens/Messages';
 import { AddressList } from '@screens/AddressList';
 import ValueTransferDetail from '@screens/ValueTransferDetail';
 import Confirm from '@screens/Confirm';
+import { LeekSign } from '@screens/LeekQr';
 
 const About = lazyScreen(() => import('@screens/About'));
 const MixnetDoctor = lazyScreen(() => import('@screens/MixnetDoctor'));
@@ -122,6 +124,7 @@ const renderTabBar = (props: BottomTabBarProps) => <CustomTabBar {...props} />;
 // swap service, which exists on mainnet alone.
 function HomeTabs() {
   const { readOnly, server } = useContext(ContextAppLoaded);
+  const board = useBoardWallet();
   const swapService = useSwapService();
   return (
     <Tab.Navigator
@@ -133,7 +136,7 @@ function HomeTabs() {
       screenOptions={{ headerShown: false, ...TAB_FADE }}
     >
       <Tab.Screen name={Route.History} component={History} />
-      {!readOnly && server.kind === 'remote' && (
+      {(!readOnly || board) && server.kind === 'remote' && (
         <Tab.Screen name={Route.Send} component={Send} />
       )}
       <Tab.Screen name={Route.Receive} component={Receive} />
@@ -255,6 +258,11 @@ export function WalletNavigator() {
         <Stack.Screen
           name={Route.MigrationSending}
           component={MigrationSending}
+        />
+        <Stack.Screen
+          name={Route.LeekSign}
+          component={LeekSign}
+          options={PANEL}
         />
         <Stack.Screen
           name={Route.SwapReview}

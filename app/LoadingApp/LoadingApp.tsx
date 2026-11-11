@@ -52,6 +52,7 @@ import {
   resolvedTrue,
   restoreWalletFromSeed,
   restoreWalletFromUfvk,
+  restoreWalletFromSigner,
   walletExists as rpcWalletExists,
   walletFileDiagnosis,
   WalletFileDiagnosis,
@@ -141,6 +142,8 @@ import {
 } from '@app/types';
 import { publishReport, reportState } from '@app/services/reportDiagnostics';
 import { forgetWalletOnFile } from '@app/services/WalletLocalData';
+import { setBoardWallet } from '@app/leek/boardWallet';
+import type { SignerDerivation } from '@app/walletBackend';
 
 const en = require('@app/translations/en.json');
 const es = require('@app/translations/es.json');
@@ -906,12 +909,18 @@ export class LoadingAppClass extends Component<
             if (
               walletKindJSON.kind ===
                 RPCWalletKindEnum.LoadedFromUnifiedFullViewingKey ||
+              walletKindJSON.kind ===
+                RPCWalletKindEnum.LoadedFromUnifiedFullViewingKeyWithSigner ||
               walletKindJSON.kind === RPCWalletKindEnum.NoKeysFound
             ) {
               readOnly = true;
             } else {
               readOnly = false;
             }
+            setBoardWallet(
+              walletKindJSON.kind ===
+                RPCWalletKindEnum.LoadedFromUnifiedFullViewingKeyWithSigner,
+            );
             orchardPool = walletKindJSON.orchard;
             saplingPool = walletKindJSON.sapling;
             transparentPool = walletKindJSON.transparent;
@@ -1283,11 +1292,18 @@ export class LoadingAppClass extends Component<
     });
   };
 
+  doRestoreSigner = (
+    ufvk: string,
+    birthday: number,
+    signer: SignerDerivation,
+  ) => this.doRestore(ufvk, birthday, Route.LeekImport, signer);
+
   // `origin` is the screen the restore started from; a failure returns there.
   doRestore = async (
     seedUfvk: string,
     birthday: number,
     origin: OnboardingRoute = Route.ImportWallet,
+    signer?: SignerDerivation,
   ) => {
     if (!seedUfvk) {
       // no reporting button, no needed.
@@ -1373,6 +1389,16 @@ export class LoadingAppClass extends Component<
         this.state.performanceLevel,
         GlobalConst.minConfirmations.toString(),
       );
+    } else if (signer) {
+      result = await restoreWalletFromSigner(
+        seedUfvk,
+        walletBirthday,
+        signer,
+        nativeUri(this.state.server),
+        this.state.server.chainName,
+        this.state.performanceLevel,
+        GlobalConst.minConfirmations.toString(),
+      );
     } else {
       result = await restoreWalletFromUfvk(
         seedUfvk.toLowerCase(),
@@ -1415,12 +1441,18 @@ export class LoadingAppClass extends Component<
             if (
               walletKindJSON.kind ===
                 RPCWalletKindEnum.LoadedFromUnifiedFullViewingKey ||
+              walletKindJSON.kind ===
+                RPCWalletKindEnum.LoadedFromUnifiedFullViewingKeyWithSigner ||
               walletKindJSON.kind === RPCWalletKindEnum.NoKeysFound
             ) {
               readOnly = true;
             } else {
               readOnly = false;
             }
+            setBoardWallet(
+              walletKindJSON.kind ===
+                RPCWalletKindEnum.LoadedFromUnifiedFullViewingKeyWithSigner,
+            );
             orchardPool = walletKindJSON.orchard;
             saplingPool = walletKindJSON.sapling;
             transparentPool = walletKindJSON.transparent;
@@ -1867,6 +1899,7 @@ export class LoadingAppClass extends Component<
       serverUnreachable: this.serverUnreachable,
       serversFor: this.serversFor,
       doRestore: this.doRestore,
+      doRestoreSigner: this.doRestoreSigner,
     };
 
     return (

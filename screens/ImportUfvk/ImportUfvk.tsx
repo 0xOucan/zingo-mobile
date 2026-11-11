@@ -51,6 +51,7 @@ type ImportUfvkProps = {
   busy: boolean;
   onClickCancel: () => void;
   onClickOK: (keyText: string, birthday: number) => void;
+  onLeek?: () => void;
 };
 // Waits for typing to pause before decoding the key.
 const KEY_CHECK_DELAY_MS = 300;
@@ -62,6 +63,7 @@ const ImportUfvk: React.FunctionComponent<ImportUfvkProps> = ({
   busy,
   onClickCancel,
   onClickOK,
+  onLeek,
 }) => {
   const context = useContext(ContextAppLoading);
   const { translate, netInfo, server, addLastSnackbar } = context;
@@ -368,6 +370,17 @@ const ImportUfvk: React.FunctionComponent<ImportUfvkProps> = ({
               keyboardType="number-pad"
             />
           </View>
+          {onLeek && (
+            <View style={{ marginTop: space12 }}>
+              <Button
+                variant="text"
+                testID="import.leek"
+                title={translate('leek.import-entry') as string}
+                disabled={busy}
+                onPress={onLeek}
+              />
+            </View>
+          )}
         </View>
       </KeyboardAwareScrollView>
       {fades}

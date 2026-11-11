@@ -47,6 +47,7 @@ export {
   resolvedTrue,
   restoreWalletFromSeed,
   restoreWalletFromUfvk,
+  restoreWalletFromSigner,
   sendAllPreview,
   sendPreview,
   setConfigWalletToProd,
@@ -60,6 +61,7 @@ export {
 export type {
   ProbeTarget,
   ServerProbe,
+  SignerDerivation,
   UfvkCheck,
   ZecPriceOutcome,
 } from './utils/walletUtils';
