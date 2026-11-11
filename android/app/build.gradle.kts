@@ -28,7 +28,13 @@ react {
     //   The list of variants to that are debuggable. For those we're going to
     //   skip the bundling of the JS bundle and the assets. By default is just 'debug'.
     //   If you add flavors like lite, prod, etc. you'll have to list your debuggableVariants.
-    debuggableVariants = listOf("prodDebug", "betaDebug")
+    //   -PbundleDebugJs=true bundles the JS into the debug variants too, for a
+    //   debug APK that starts without Metro.
+    debuggableVariants = if ((findProperty("bundleDebugJs") as? String)?.toBoolean() == true) {
+        emptyList()
+    } else {
+        listOf("prodDebug", "betaDebug")
+    }
 
     /* Bundling */
     //   A list containing the node command and its flags. Default is just 'node'.
@@ -106,20 +112,37 @@ val includeUniversalApk = (project.findProperty("includeUniversalApk") as? Strin
 // The fetch extracts the bundle as a Maven repository and prints its root
 // first. Gradle runs it when the repository resolves, not at configuration.
 // Gradle execs node by name, which resolves on every platform.
+// A local zingolib build replaces the pinned bundle when both
+// bindingLayerLocalRepository and bindingLayerLocalVersion are set.
+val bindingLayerLocalRepository = providers.gradleProperty("bindingLayerLocalRepository")
+val bindingLayerLocalVersion = providers.gradleProperty("bindingLayerLocalVersion")
+val bindingLayerLocal = bindingLayerLocalRepository.isPresent && bindingLayerLocalVersion.isPresent
 val bindingLayerPin = groovy.json.JsonSlurper().parse(rootProject.file("../binding-layer.json")) as Map<*, *>
-val bindingLayerCoordinate = (bindingLayerPin["coordinates"] as Map<*, *>)["android"] as String
+val bindingLayerPinned = (bindingLayerPin["coordinates"] as Map<*, *>)["android"] as String
+val bindingLayerCoordinate = if (bindingLayerLocal) {
+    "${bindingLayerPinned.substringBeforeLast(":")}:${bindingLayerLocalVersion.get()}"
+} else {
+    bindingLayerPinned
+}
 val bindingLayerGroup = bindingLayerCoordinate.substringBefore(":")
 val bindingLayerFetch = providers.exec {
     workingDir(rootProject.file(".."))
     commandLine("node", rootProject.file("../scripts/fetch_binding_layer.mjs").absolutePath, "--platform", "android")
     isIgnoreExitValue = true
 }
-val bindingLayerRepository = bindingLayerFetch.result.map { result ->
-    if (result.exitValue != 0) {
-        throw GradleException(bindingLayerFetch.standardError.asText.get().trim())
+val bindingLayerRepository: Provider<String> = if (bindingLayerLocal) {
+    bindingLayerLocalRepository
+} else {
+    bindingLayerFetch.result.map { result ->
+        if (result.exitValue != 0) {
+            throw GradleException(bindingLayerFetch.standardError.asText.get().trim())
+        }
+        bindingLayerFetch.standardOutput.asText.get().trim().lines().first()
     }
-    bindingLayerFetch.standardOutput.asText.get().trim().lines().first()
 }
+
+// The LeekWallet SDK that scripts/leek_sdk_android.sh builds.
+val leekSdk = layout.projectDirectory.dir("build/leek-sdk")
 
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("local.zingo.jks.properties")
@@ -247,7 +270,7 @@ android {
             // this may cause problems
             //vcsInfo.include false
             isMinifyEnabled = enableProguardInReleaseBuilds
-            proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
+            proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro", leekSdk.file("consumer-rules.pro"))
             testProguardFiles("proguard-test-rules.pro")
         }
     }
@@ -260,6 +283,13 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true  // Ensures stable binary layout
+        }
+    }
+
+    sourceSets {
+        getByName("main") {
+            java.srcDir(leekSdk.dir("kotlin"))
+            jniLibs.srcDir(leekSdk.dir("jniLibs"))
         }
     }
 
@@ -294,6 +324,15 @@ android {
                     targetDevices.add(pixel2api30)
                 }
             }
+        }
+    }
+}
+
+val leekSdkBindings = leekSdk.file("kotlin/io/leekwallet/zcash/sdk/leek_zcash_ffi.kt")
+tasks.named("preBuild") {
+    doFirst {
+        if (!leekSdkBindings.asFile.exists()) {
+            throw GradleException("the LeekWallet SDK is missing: run LEEK_SDK_HOST=<sdk host/> scripts/leek_sdk_android.sh")
         }
     }
 }
