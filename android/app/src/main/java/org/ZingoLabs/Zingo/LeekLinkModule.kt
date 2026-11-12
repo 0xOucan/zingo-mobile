@@ -13,7 +13,7 @@ import io.leekwallet.zcash.sdk.SignerView
 import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** Imports the board's account and signs the stored proposal with a LeekWallet board over USB or Bluetooth LE, pairing afresh on every connection. */
+/** Imports the board's account, checks addresses on it and signs the stored proposal with a LeekWallet board over USB or Bluetooth LE, pairing afresh on every connection. */
 class LeekLinkModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
     private class Link(val device: LeekDevice, val transport: AutoCloseable)
@@ -123,7 +123,7 @@ class LeekLinkModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     }
 
     private fun prepared(): Pair<LeekSigner, ByteArray> {
-        reactApplicationContext.getNativeModule(LeekQrModule::class.java)?.takePrepared()?.let { return it }
+        qr().takePrepared()?.let { return it }
         val signer = LeekSigner.read(reactApplicationContext)
         stage("building")
         val pczt = try {
@@ -140,7 +140,11 @@ class LeekLinkModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
         }
     }
 
-    /** Signs the stored proposal on the connected board, then proves, stores and broadcasts it; returns `{ txids }`. */
+    private fun qr(): LeekQrModule =
+        reactApplicationContext.getNativeModule(LeekQrModule::class.java)
+            ?: throw IllegalStateException("the QR module is missing")
+
+    /** Signs the stored proposal on the connected board and proves it; `LeekQrModule.broadcast` stores and sends it. */
     @ReactMethod
     fun sign(promise: Promise) {
         settleLeek(promise) {
@@ -148,7 +152,7 @@ class LeekLinkModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
                 try {
                     val device = connected().device
                     val (signer, pczt) = prepared()
-                    val stored = try {
+                    try {
                         if (cancelled.get()) throw LeekLinkException("LeekLinkCancelled", "Cancelled.")
                         val signed = device.signPczt(pczt, signer.meta(), SignerView.COMPACT, true, object : SignListener {
                             override fun onProgress(progress: SignProgress) {
@@ -164,17 +168,30 @@ class LeekLinkModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
                         })
                         closeLink()
                         stage("proving")
-                        uniffi.zingo.pcztFinishAndStore(uniffi.zingo.pcztProve(signed.signedPczt))
+                        qr().hold(uniffi.zingo.pcztProve(signed.signedPczt))
                     } catch (e: Exception) {
                         runCatching { abandon() }
                         throw e
                     }
-                    saveWallet()
-                    stage("sending")
-                    val txids = JSONObject(stored).getJSONArray("txids")
-                    val sent = uniffi.zingo.transmitCalculated(List(txids.length()) { txids.getString(it) })
-                    saveWallet()
-                    sent
+                    ""
+                } finally {
+                    closeLink()
+                    stage("idle")
+                }
+            }
+        }
+    }
+
+    /** Shows `address` on the connected board for account confirmation, then closes the link; answers `verified`, `rejected`, `not_ours` or `unsupported`. */
+    @ReactMethod
+    fun showAddress(address: String, chainhint: String, promise: Promise) {
+        settleLeek(promise) {
+            exclusive {
+                try {
+                    val signer = LeekSigner.read(reactApplicationContext)
+                    val network = LeekSigner.network(chainhint)
+                    stage("address")
+                    connected().device.showAddress(signer.index, network, address).name.lowercase()
                 } finally {
                     closeLink()
                     stage("idle")

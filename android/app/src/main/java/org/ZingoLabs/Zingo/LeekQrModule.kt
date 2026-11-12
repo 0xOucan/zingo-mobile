@@ -21,6 +21,8 @@ class LeekQrModule(reactContext: ReactApplicationContext) : ReactContextBaseJava
     private val lock = Any()
     private var scanner: QrScanner? = null
     private var session: Session? = null
+    private var proven: ByteArray? = null
+    private var stored: List<String>? = null
 
     override fun getName(): String = "LeekQrModule"
 
@@ -95,7 +97,10 @@ class LeekQrModule(reactContext: ReactApplicationContext) : ReactContextBaseJava
         .toString()
 
     private fun abandon() {
-        synchronized(lock) { session = null }
+        synchronized(lock) {
+            session = null
+            proven = null
+        }
         uniffi.zingo.pcztAbandon()
         saveWallet()
     }
@@ -144,24 +149,75 @@ class LeekQrModule(reactContext: ReactApplicationContext) : ReactContextBaseJava
         }
     }
 
-    /** Applies the scanned signatures, proves, stores and broadcasts; returns `{ txids }`. */
+    /** Applies the scanned signatures and proves; [broadcast] stores and sends the result. */
     @ReactMethod
-    fun signFinish(promise: Promise) {
+    fun signProve(promise: Promise) {
         settling(promise) {
             val current = synchronized(lock) { session } ?: throw IllegalStateException("no signing session")
             val zsig = synchronized(lock) { scanner?.zsig() } ?: throw IllegalStateException("the signatures are incomplete")
-            val stored = try {
+            try {
                 val signed = io.leekwallet.zcash.sdk.applyZsig(current.prepared, current.sent, zsig)
-                val proven = uniffi.zingo.pcztProve(signed)
-                uniffi.zingo.pcztFinishAndStore(proven)
+                hold(uniffi.zingo.pcztProve(signed))
             } catch (e: Exception) {
                 runCatching { abandon() }
                 throw e
             }
-            synchronized(lock) { session = null }
-            saveWallet()
-            val txids = JSONObject(stored).getJSONArray("txids")
-            val sent = uniffi.zingo.transmitCalculated(List(txids.length()) { txids.getString(it) })
+            ""
+        }
+    }
+
+    /** Keeps the signed, proven PCZT until [broadcast] stores and sends it. */
+    internal fun hold(pczt: ByteArray) {
+        synchronized(lock) {
+            session = null
+            proven = pczt
+            stored = null
+        }
+    }
+
+    private fun mixnetReady(): Boolean {
+        val indicator = JSONObject(uniffi.zingo.mixnetIndicator())
+        return indicator.optString("mixnet_indicator") == "ready" && indicator.has("socks5_addr")
+    }
+
+    private fun store(pczt: ByteArray): List<String> {
+        val txids = try {
+            JSONObject(uniffi.zingo.pcztFinishAndStore(pczt)).getJSONArray("txids")
+        } catch (e: Exception) {
+            runCatching { abandon() }
+            throw e
+        }
+        val ids = List(txids.length()) { txids.getString(it) }
+        synchronized(lock) {
+            proven = null
+            stored = ids
+        }
+        saveWallet()
+        return ids
+    }
+
+    /** Stores the held transaction once the mixnet is ready and sends it, keeping it for a retry when the send is refused; returns `{ txids }`. */
+    @ReactMethod
+    fun broadcast(promise: Promise) {
+        settling(promise) {
+            val (pczt, held) = synchronized(lock) { proven to stored }
+            if (pczt == null && held == null) {
+                throw IllegalStateException("no signed transaction")
+            }
+            if (!mixnetReady()) {
+                throw LeekLinkException("LeekMixnetNotReady", "The Nym mixnet is not ready.")
+            }
+            val txids = held ?: store(checkNotNull(pczt))
+            val sent = try {
+                uniffi.zingo.transmitCalculated(txids)
+            } catch (e: Exception) {
+                if (e !is uniffi.zingo.ZingolibException.Mixnet && e !is uniffi.zingo.ZingolibException.Offline) {
+                    synchronized(lock) { stored = null }
+                    saveWallet()
+                }
+                throw e
+            }
+            synchronized(lock) { stored = null }
             saveWallet()
             sent
         }
@@ -174,9 +230,9 @@ class LeekQrModule(reactContext: ReactApplicationContext) : ReactContextBaseJava
     private var savedBrightness: Float? = null
     private var addedKeepOn = false
 
-    /** Sets the window to full brightness with the screen kept on, or restores both. */
+    /** Keeps the screen on at `level` (0 to 1), or at the system brightness for a negative `level`. */
     @ReactMethod
-    fun brightScreen(on: Boolean, promise: Promise) {
+    fun holdScreen(level: Double, promise: Promise) {
         val activity = reactApplicationContext.currentActivity
         if (activity == null) {
             promise.resolve(false)
@@ -185,37 +241,56 @@ class LeekQrModule(reactContext: ReactApplicationContext) : ReactContextBaseJava
         activity.runOnUiThread {
             val window = activity.window
             val attrs = window.attributes
-            if (on) {
-                if (savedBrightness == null) {
-                    savedBrightness = attrs.screenBrightness
-                    addedKeepOn = attrs.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON == 0
-                }
-                attrs.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_FULL
-                window.attributes = attrs
-                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            } else {
-                savedBrightness?.let {
-                    attrs.screenBrightness = it
-                    window.attributes = attrs
-                }
-                if (addedKeepOn) {
-                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                }
-                savedBrightness = null
-                addedKeepOn = false
+            if (savedBrightness == null) {
+                savedBrightness = attrs.screenBrightness
+                addedKeepOn = attrs.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON == 0
             }
+            attrs.screenBrightness = if (level < 0) {
+                WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+            } else {
+                level.toFloat().coerceIn(0.01f, 1f)
+            }
+            window.attributes = attrs
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             promise.resolve(true)
         }
     }
 
-    /** Ends the signing session and releases the inputs it reserved. */
+    /** Restores the brightness and the keep-on flag [holdScreen] changed. */
+    @ReactMethod
+    fun releaseScreen(promise: Promise) {
+        val activity = reactApplicationContext.currentActivity
+        if (activity == null) {
+            promise.resolve(false)
+            return
+        }
+        activity.runOnUiThread {
+            val window = activity.window
+            savedBrightness?.let {
+                val attrs = window.attributes
+                attrs.screenBrightness = it
+                window.attributes = attrs
+            }
+            if (addedKeepOn) {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+            savedBrightness = null
+            addedKeepOn = false
+            promise.resolve(true)
+        }
+    }
+
+    /** Ends the signing session and releases the inputs it reserved; answers `prepared` when a stored, unsent transaction is left. */
     @ReactMethod
     fun signAbandon(promise: Promise) {
         settling(promise) {
-            if (synchronized(lock) { session } != null) {
+            val (open, left) = synchronized(lock) {
+                (session != null || proven != null) to (stored != null).also { stored = null }
+            }
+            if (open) {
                 abandon()
             }
-            ""
+            if (left) "prepared" else ""
         }
     }
 }
