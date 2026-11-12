@@ -8,7 +8,8 @@ import {
 
 import { Route } from '@app/AppState';
 import { ContextAppLoaded, useSwapService } from '@app/context';
-import { useBoardWallet } from '@app/leek/boardWallet';
+import { setSignerOpener, useBoardWallet } from '@app/leek/boardFlag';
+import { navigateWallet } from './navigate';
 import { AppDrawerParamList, HomeTabParamList } from '@app/types';
 import CustomTabBar from './CustomTabBar';
 import { skipExitingWithScreen } from './screenLayout';
@@ -28,7 +29,7 @@ import { MessageList } from '@screens/Messages';
 import { AddressList } from '@screens/AddressList';
 import ValueTransferDetail from '@screens/ValueTransferDetail';
 import Confirm from '@screens/Confirm';
-import { LeekSign } from '@screens/LeekQr';
+import { LeekSign, LeekVerify } from '@screens/LeekQr';
 
 const About = lazyScreen(() => import('@screens/About'));
 const MixnetDoctor = lazyScreen(() => import('@screens/MixnetDoctor'));
@@ -161,6 +162,10 @@ function Home() {
 // over them, the one-way flows, and the overlays.
 export function WalletNavigator() {
   useEffect(() => preloadScreens(PRELOAD), []);
+  useEffect(() => {
+    setSignerOpener(() => navigateWallet({ screen: Route.LeekSign }));
+    return () => setSignerOpener(undefined);
+  }, []);
   return (
     <Stack.Navigator
       initialRouteName={Route.Home}
@@ -262,6 +267,11 @@ export function WalletNavigator() {
         <Stack.Screen
           name={Route.LeekSign}
           component={LeekSign}
+          options={PANEL}
+        />
+        <Stack.Screen
+          name={Route.LeekVerify}
+          component={LeekVerify}
           options={PANEL}
         />
         <Stack.Screen

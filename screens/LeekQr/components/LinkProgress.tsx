@@ -70,8 +70,9 @@ export function LinkProgress({ link, status, translate }: LinkProgressProps) {
       case 'applying':
         return t('leek.link-applying');
       case 'proving':
-      case 'sending':
         return t('leek.sign-finishing');
+      case 'address':
+        return t('leek.link-address');
     }
   })();
   return (

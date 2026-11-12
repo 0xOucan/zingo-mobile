@@ -133,6 +133,7 @@ export type AppDrawerParamList = {
   [Route.AddressList]: AddressListNavigationState | undefined;
   [Route.ValueTransferDetail]: ValueTransferDetailNavigationState | undefined;
   [Route.Confirm]: ConfirmNavigationState | undefined;
+  [Route.LeekVerify]: { address: string };
   [Route.SwapReview]: SwapReviewNavigationState;
   [Route.SwapDeposit]: SwapRecordNavigationState;
   [Route.SwapTracking]: SwapRecordNavigationState;

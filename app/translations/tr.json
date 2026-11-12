@@ -732,7 +732,8 @@
     "public-note": "Herkese açık",
     "group-count-one": "1 adres",
     "group-swaps": "Swap adresleri",
-    "swaps-lead": "Her swap için bir tane, böylece swap’lar ilişkilendirilemez."
+    "swaps-lead": "Her swap için bir tane, böylece swap’lar ilişkilendirilemez.",
+    "verify-board": "Verify on LeekWallet"
   },
   "swap": {
     "title": "Takas",
@@ -1625,7 +1626,7 @@
     "method-qr": "QR",
     "method-usb": "USB",
     "method-ble": "Bluetooth",
-    "sign-oled-tip": "OLED phone: brightness 100 %, turn on anti-flicker/DC dimming, board exposure 0, Big codes, board at 3x about 30 cm away.",
+    "sign-oled-tip": "If the board finds the code but does not read it, lower the brightness, then try it higher. OLED phone: turn on anti-flicker/DC dimming. Board at 3x, about 30 cm away.",
     "link-hint-usb": "Connect the board's USB port to the phone with a USB-OTG cable.",
     "link-hint-ble": "On the board: Settings → Link → Bluetooth.",
     "link-sign": "Connect and sign",
@@ -1640,6 +1641,21 @@
     "link-checking": "Checking the transaction…",
     "link-uploading": "Sending the transaction to the board: {sent} / {total} bytes",
     "link-review": "Review the transaction on the board. Accepting its last page signs.",
-    "link-applying": "Checking the board's signatures…"
+    "link-applying": "Checking the board's signatures…",
+    "brightness": "Brightness: {level}",
+    "brightness-system": "system",
+    "mixnet-wait": "Connecting to the mixnet…",
+    "mixnet-timeout": "The mixnet did not connect within 90 s.",
+    "mixnet-nothing": "Nothing was sent.",
+    "mixnet-prepared": "The signed transaction was not sent. It stays in History as Prepared until it expires (about 40 blocks), then shows as Failed.",
+    "verify-title": "Check address on LeekWallet",
+    "verify-qr-hint": "On the board: Main menu → Check address, then scan this code.",
+    "experimental": "Experimental",
+    "link-verify": "Connect and check",
+    "link-address": "Compare the address on the board with the one on this screen, then confirm on the board.",
+    "verify-verified": "The board derived this address, and you confirmed that it matches.",
+    "verify-rejected": "You answered on the board that the address does not match. Do not receive to it.",
+    "verify-not-ours": "The board says that this address is not from its wallet. Do not receive to it.",
+    "verify-unsupported": "This address has a Sapling receiver, which the board cannot check."
   }
 }

@@ -24,7 +24,14 @@ import { VerifyCheckIcon } from '@ui/primitives/Icons/VerifyCheckIcon';
 import { VerifyXIcon } from '@ui/primitives/Icons/VerifyXIcon';
 import { SheetFooter } from '@ui/primitives/AppSheetModal';
 
-const VerifyAddress: React.FunctionComponent = () => {
+type VerifyAddressProps = {
+  /** Checks the pasted address, or the shown one when none is pasted, on the LeekWallet board. */
+  onBoard?: (address: string) => void;
+};
+
+const VerifyAddress: React.FunctionComponent<VerifyAddressProps> = ({
+  onBoard,
+}) => {
   const context = useContext(ContextAppLoaded);
   const { translate, addLastSnackbar, server } = context;
   const { colors } = useTheme();
@@ -185,6 +192,14 @@ const VerifyAddress: React.FunctionComponent = () => {
             }}
           >
             <ButtonStack>
+              {!!onBoard && (
+                <Button
+                  variant="secondary"
+                  testID="receive.verify-board"
+                  title={translate('receive.verify-board') as string}
+                  onPress={() => onBoard(errorAddress ? '' : address)}
+                />
+              )}
               <Button
                 variant="primary"
                 title={translate('verify') as string}

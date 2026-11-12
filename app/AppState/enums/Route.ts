@@ -56,6 +56,7 @@ export const Route = {
   Scanner: 'Scanner',
   ValueTransferDetail: 'ValueTransferDetail',
   Confirm: 'Confirm',
+  LeekVerify: 'LeekVerify',
 } as const;
 
 export type Route = (typeof Route)[keyof typeof Route];

@@ -21,7 +21,7 @@ import { toFfiError } from '@app/walletBackend/ffi';
 import { SyncCoordinator } from './SyncCoordinator';
 import { withSyncStopped } from '@app/walletBackend/utils/syncBracket';
 import { Buffer } from 'buffer';
-import { isBoardWallet, requestBoardSignature } from '@app/leek/boardWallet';
+import { isBoardWallet, requestBoardSignature } from '@app/leek/boardFlag';
 
 // What a swap deposit needs: where, how much, and the memo or source address
 // rule that decides its shape.

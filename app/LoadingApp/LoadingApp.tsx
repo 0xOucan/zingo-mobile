@@ -142,7 +142,7 @@ import {
 } from '@app/types';
 import { publishReport, reportState } from '@app/services/reportDiagnostics';
 import { forgetWalletOnFile } from '@app/services/WalletLocalData';
-import { setBoardWallet } from '@app/leek/boardWallet';
+import { setBoardWallet } from '@app/leek/boardFlag';
 import type { SignerDerivation } from '@app/walletBackend';
 
 const en = require('@app/translations/en.json');

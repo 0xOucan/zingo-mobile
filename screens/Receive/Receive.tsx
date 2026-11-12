@@ -42,6 +42,7 @@ import { PANEL_TOP } from '@ui/widgets/Header/Header';
 import { useReceiveSelection } from './useReceiveSelection';
 import { useSwapAddresses } from './useSwapAddresses';
 import { useCompact } from '@app/hooks/useCompact';
+import { useBoardWallet } from '@app/leek/boardFlag';
 
 type ReceiveProps = HomeTabScreenProps<'Receive'>;
 
@@ -69,6 +70,7 @@ const Receive: React.FunctionComponent<ReceiveProps> = () => {
     setPrivacyOption,
   } = context;
   const t = (key: string) => translate(key) as string;
+  const board = useBoardWallet();
 
   const [sheetType, setSheetType] = useState<SheetType | null>(null);
 
@@ -268,7 +270,20 @@ const Receive: React.FunctionComponent<ReceiveProps> = () => {
             setAddressBook={setAddressBook}
           />
         )}
-        {sheetType === 'VA' && <VerifyAddress />}
+        {sheetType === 'VA' && (
+          <VerifyAddress
+            onBoard={
+              board && current
+                ? (pasted: string) => {
+                    hide();
+                    navigation.navigate(Route.LeekVerify, {
+                      address: pasted || current.address,
+                    });
+                  }
+                : undefined
+            }
+          />
+        )}
       </AppSheetModal>
     </View>
   );

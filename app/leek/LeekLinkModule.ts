@@ -15,7 +15,7 @@ export type LinkStage =
   | 'review'
   | 'applying'
   | 'proving'
-  | 'sending';
+  | 'address';
 
 export type LinkStatus = {
   stage: LinkStage;
@@ -37,6 +37,7 @@ type LeekLinkAPI = {
   connect(kind: LeekLink): Promise<string>;
   getAccount(chainhint: string): Promise<string>;
   sign(): Promise<string>;
+  showAddress(address: string, chainhint: string): Promise<string>;
   status(): Promise<string>;
   cancel(): Promise<string>;
 };
@@ -52,8 +53,31 @@ export const linkConnect = async (
 export const linkAccount = async (chain: string): Promise<LinkAccount> =>
   JSON.parse(await LeekLinkNative.getAccount(chain));
 
-/** Signs on the connected board, proves, stores and broadcasts; resolves `{ txids }` JSON. */
+/** Signs on the connected board and proves; `broadcast` sends the result. */
 export const linkSign = () => LeekLinkNative.sign();
+
+/** What the board answered about an address it showed. */
+export type AddressCheck = 'verified' | 'rejected' | 'not_ours' | 'unsupported';
+
+const ADDRESS_CHECKS: AddressCheck[] = [
+  'verified',
+  'rejected',
+  'not_ours',
+  'unsupported',
+];
+
+/** Shows the address on the connected board and resolves the user's answer there. */
+export const linkShowAddress = async (
+  address: string,
+  chain: string,
+): Promise<AddressCheck> => {
+  const answer = await LeekLinkNative.showAddress(address, chain);
+  const check = ADDRESS_CHECKS.find(known => known === answer);
+  if (!check) {
+    throw new Error(`unknown address check ${answer}`);
+  }
+  return check;
+};
 
 export const linkStatus = async (): Promise<LinkStatus> =>
   JSON.parse(await LeekLinkNative.status());

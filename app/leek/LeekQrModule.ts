@@ -36,9 +36,11 @@ type LeekQrAPI = {
   signStart(fragmentLen: number): Promise<string>;
   signFragment(fragmentLen: number): Promise<string>;
   signFrames(start: number, count: number): Promise<string>;
-  signFinish(): Promise<string>;
+  signProve(): Promise<string>;
+  broadcast(): Promise<string>;
   signAbandon(): Promise<string>;
-  brightScreen(on: boolean): Promise<boolean>;
+  holdScreen(level: number): Promise<boolean>;
+  releaseScreen(): Promise<boolean>;
 };
 
 const LeekQr = NativeModules.LeekQrModule as LeekQrAPI;
@@ -63,10 +65,18 @@ export const signFrames = async (
   count: number,
 ): Promise<string[]> => JSON.parse(await LeekQr.signFrames(start, count));
 
-/** Applies the board's signatures, proves, stores and broadcasts; resolves `{ txids }` JSON. */
-export const signFinish = () => LeekQr.signFinish();
+/** Applies the board's signatures and proves; `broadcast` sends the result. */
+export const signProve = () => LeekQr.signProve();
 
-export const signAbandon = () => LeekQr.signAbandon();
+/** Stores the signed transaction once the mixnet is ready and sends it; resolves `{ txids }` JSON. */
+export const broadcast = () => LeekQr.broadcast();
 
-/** Sets the window to full brightness with the screen kept on, or restores both. */
-export const brightScreen = (on: boolean) => LeekQr.brightScreen(on);
+/** Ends the signing session; resolves whether a stored, unsent transaction is left. */
+export const signAbandon = async (): Promise<boolean> =>
+  (await LeekQr.signAbandon()) === 'prepared';
+
+/** Keeps the screen on at a brightness from 0 to 1, or at the system brightness. */
+export const holdScreen = (level: number | 'system') =>
+  LeekQr.holdScreen(level === 'system' ? -1 : level);
+
+export const releaseScreen = () => LeekQr.releaseScreen();

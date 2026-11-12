@@ -732,7 +732,8 @@
     "public-note": "Públicas",
     "group-count-one": "1 dirección",
     "group-swaps": "Direcciones de swaps",
-    "swaps-lead": "Una por swap, para que los swaps no se puedan relacionar."
+    "swaps-lead": "Una por swap, para que los swaps no se puedan relacionar.",
+    "verify-board": "Verificar en la LeekWallet"
   },
   "swap": {
     "title": "Swap",
@@ -1625,7 +1626,7 @@
     "method-qr": "QR",
     "method-usb": "USB",
     "method-ble": "Bluetooth",
-    "sign-oled-tip": "Cel con OLED: brillo al 100 %, prende el anti-flicker/DC dimming, exposure 0 en la board, Códigos grandes, board en 3x a unos 30 cm.",
+    "sign-oled-tip": "Si la board encuentra el código pero no lo lee, bájale al brillo y luego prueba más alto. Cel con OLED: prende el anti-flicker/DC dimming. Board en 3x a unos 30 cm.",
     "link-hint-usb": "Conecta el puerto USB de la board al cel con un cable USB-OTG.",
     "link-hint-ble": "En la board: Settings → Link → Bluetooth.",
     "link-sign": "Conectar y firmar",
@@ -1640,6 +1641,21 @@
     "link-checking": "Revisando la transacción…",
     "link-uploading": "Mandando la transacción a la board: {sent} / {total} bytes",
     "link-review": "Revisa la transacción en la board. Al aceptar la última página, firma.",
-    "link-applying": "Revisando las firmas de la board…"
+    "link-applying": "Revisando las firmas de la board…",
+    "brightness": "Brillo: {level}",
+    "brightness-system": "sistema",
+    "mixnet-wait": "Conectando a la mixnet…",
+    "mixnet-timeout": "La mixnet no conectó en 90 s.",
+    "mixnet-nothing": "No se mandó nada.",
+    "mixnet-prepared": "La transacción firmada no se mandó. Se queda en el Historial como Preparada hasta que expire (unos 40 bloques) y luego sale como Fallida.",
+    "verify-title": "Checar dirección en la LeekWallet",
+    "verify-qr-hint": "En la board: Main menu → Check address y luego escanea este código.",
+    "experimental": "Experimental",
+    "link-verify": "Conectar y checar",
+    "link-address": "Compara la dirección de la board con la de esta pantalla y luego confirma en la board.",
+    "verify-verified": "La board sacó esta dirección de sus llaves y confirmaste que coincide.",
+    "verify-rejected": "En la board dijiste que la dirección no coincide. No recibas en ella.",
+    "verify-not-ours": "La board dice que esta dirección no es de su wallet. No recibas en ella.",
+    "verify-unsupported": "Esta dirección trae un receiver Sapling, y la board no lo puede checar."
   }
 }

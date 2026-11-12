@@ -21,15 +21,20 @@ import {
 import {
   QrFrameInfo,
   QrProgress,
-  brightScreen,
+  broadcast,
   scanFeed,
   scanStart,
   signAbandon,
-  signFinish,
   signFragment,
   signFrames,
+  signProve,
   signStart,
 } from '@app/leek/LeekQrModule';
+import {
+  MIXNET_WAIT_MS,
+  mixnetReady,
+  waitForMixnet,
+} from '@app/leek/mixnetWait';
 import {
   LeekLink,
   linkCancel,
@@ -43,6 +48,7 @@ import SegmentedSwitch from '@ui/widgets/SegmentedSwitch';
 import { UrFrames } from './components/UrFrames';
 import { UrCamera } from './components/UrCamera';
 import { LinkProgress, useLinkStatus } from './components/LinkProgress';
+import { brightnessLabel, useQrBrightness } from './components/QrBrightness';
 
 type LeekSignProps = NativeStackScreenProps<AppDrawerParamList, 'LeekSign'>;
 
@@ -50,6 +56,7 @@ type Phase =
   | { kind: 'building' }
   | { kind: 'show'; frames: string[] }
   | { kind: 'scan'; progress?: QrProgress }
+  | { kind: 'mixnet' }
   | { kind: 'finishing' }
   | { kind: 'linkReady'; message?: string }
   | { kind: 'linking' }
@@ -57,6 +64,17 @@ type Phase =
 
 const MAX_FRAMES = 255;
 const MIN_FRAMES = 20;
+
+/** Rejections that a ready mixnet clears: ours before storing, zingolib's send refusal after. */
+const MIXNET_CODES = ['LeekMixnetNotReady', 'Mixnet'];
+
+const RETRY_MS = 1_000;
+
+const pause = (ms: number) =>
+  new Promise<void>(resolve => setTimeout(resolve, ms));
+
+const codeOf = (error: unknown): string =>
+  error instanceof Error && 'code' in error ? String(error.code) : '';
 
 const framesFor = (info: QrFrameInfo) =>
   signFrames(0, Math.min(MAX_FRAMES, Math.max(MIN_FRAMES, info.seq_len * 4)));
@@ -73,14 +91,14 @@ export function LeekSign({ navigation }: LeekSignProps) {
   const finishing = useRef(false);
   const qrBuilt = useRef(false);
   const holding = useRef(false);
+  const stopped = useRef(false);
   const status = useLinkStatus(phase.kind === 'linking');
-  const deny = useRef('');
-  deny.current = translate('leek.link-permission') as string;
+  const t = useRef((key: string) => key);
+  t.current = (key: string) => translate(key) as string;
 
   holding.current =
     phase.kind === 'finishing' ||
-    (phase.kind === 'linking' &&
-      (status.stage === 'proving' || status.stage === 'sending'));
+    (phase.kind === 'linking' && status.stage === 'proving');
 
   const settle = (signature: BoardSignature) => {
     if (!settled.current) {
@@ -100,6 +118,73 @@ export function LeekSign({ navigation }: LeekSignProps) {
     navigation.goBack();
   };
 
+  /** Ends the session and shows `reason` with what happened to the signed transaction. */
+  const giveUp = async (reason: string) => {
+    const left = await signAbandon();
+    fail(
+      `${reason} ${t.current(left ? 'leek.mixnet-prepared' : 'leek.mixnet-nothing')}`,
+    );
+  };
+
+  /** Waits on the mixnet page until the mixnet is ready, and fails the send when `budget` ms pass first. */
+  const mixnet = async (budget = MIXNET_WAIT_MS): Promise<boolean> => {
+    if (await mixnetReady()) {
+      return true;
+    }
+    setPhase({ kind: 'mixnet' });
+    const wait = await waitForMixnet(() => stopped.current, undefined, budget);
+    if (wait === 'timeout') {
+      await giveUp(t.current('leek.mixnet-timeout'));
+    }
+    return wait === 'ready';
+  };
+
+  /** Stores and sends the proven transaction, waiting up to 90 s in all for the mixnet whenever it refuses. */
+  const send = async () => {
+    const deadline = Date.now() + MIXNET_WAIT_MS;
+    for (;;) {
+      finishing.current = true;
+      setPhase({ kind: 'finishing' });
+      try {
+        sent(await broadcast());
+        return;
+      } catch (error) {
+        finishing.current = false;
+        const code = codeOf(error);
+        if (code === 'Offline') {
+          await giveUp((error as Error).message);
+          return;
+        }
+        if (!MIXNET_CODES.includes(code)) {
+          throw error;
+        }
+      }
+      setPhase({ kind: 'mixnet' });
+      await pause(RETRY_MS);
+      if (stopped.current) {
+        return;
+      }
+      if (Date.now() >= deadline) {
+        await giveUp(t.current('leek.mixnet-timeout'));
+        return;
+      }
+      if (!(await mixnet(deadline - Date.now())) || stopped.current) {
+        return;
+      }
+    }
+  };
+
+  const start = async (saved: QrPreset, chosen: SignMethod) => {
+    if (!(await mixnet())) {
+      return;
+    }
+    if (chosen === 'qr') {
+      await showQr(saved);
+    } else {
+      setPhase({ kind: 'linkReady' });
+    }
+  };
+
   const showQr = async (next: QrPreset) => {
     setPhase({ kind: 'building' });
     const info = qrBuilt.current
@@ -114,13 +199,10 @@ export function LeekSign({ navigation }: LeekSignProps) {
       const [saved, chosen] = await Promise.all([readPreset(), readMethod()]);
       setPreset(saved);
       setMethod(chosen);
-      if (chosen === 'qr') {
-        await showQr(saved);
-      } else {
-        setPhase({ kind: 'linkReady' });
-      }
+      await start(saved, chosen);
     })().catch((error: Error) => fail(error.message));
     return () => {
+      stopped.current = true;
       linkCancel().catch(() => undefined);
       if (!finishing.current) {
         signAbandon().catch(() => undefined);
@@ -141,16 +223,7 @@ export function LeekSign({ navigation }: LeekSignProps) {
   );
 
   const showing = phase.kind === 'show';
-
-  useEffect(() => {
-    if (!showing) {
-      return;
-    }
-    brightScreen(true).catch(() => undefined);
-    return () => {
-      brightScreen(false).catch(() => undefined);
-    };
-  }, [showing]);
+  const brightness = useQrBrightness(showing);
 
   const chooseMethod = async (next: SignMethod) => {
     setMethod(next);
@@ -176,7 +249,10 @@ export function LeekSign({ navigation }: LeekSignProps) {
 
   const signOver = async (link: LeekLink) => {
     if (!(await linkPermissions(link))) {
-      setPhase({ kind: 'linkReady', message: deny.current });
+      setPhase({
+        kind: 'linkReady',
+        message: t.current('leek.link-permission'),
+      });
       return;
     }
     setPhase({ kind: 'linking' });
@@ -188,7 +264,8 @@ export function LeekSign({ navigation }: LeekSignProps) {
       },
     );
     if (connected) {
-      sent(await linkSign());
+      await linkSign();
+      await send();
     }
   };
 
@@ -209,15 +286,21 @@ export function LeekSign({ navigation }: LeekSignProps) {
     } else if (progress.state === 'complete' && !finishing.current) {
       finishing.current = true;
       setPhase({ kind: 'finishing' });
-      sent(await signFinish());
+      await signProve();
+      await send();
     }
   };
 
   const cancel = async () => {
+    stopped.current = true;
     await linkCancel().catch(() => undefined);
-    await signAbandon().catch(() => undefined);
+    const left = await signAbandon().catch(() => false);
     settle({ kind: 'error', message: 'cancelled' });
-    navigation.goBack();
+    if (left) {
+      setPhase({ kind: 'failed', message: t.current('leek.mixnet-prepared') });
+    } else {
+      navigation.goBack();
+    }
   };
 
   const switchable = showing || phase.kind === 'linkReady';
@@ -279,6 +362,19 @@ export function LeekSign({ navigation }: LeekSignProps) {
             >
               {translate('leek.sign-oled-tip') as string}
             </Text>
+            <Text
+              variant="caption"
+              style={{ color: colors.bgQrPaper, textAlign: 'center' }}
+            >
+              {translate('leek.experimental') as string}
+            </Text>
+            <Button
+              variant="secondary"
+              testID="leek.sign.brightness"
+              title={brightnessLabel(brightness.level, translate)}
+              onPress={brightness.cycle}
+              style={{ alignSelf: 'stretch' }}
+            />
             <SegmentedSwitch
               testID="leek.sign.preset"
               options={QR_PRESETS.map(p => ({
@@ -349,6 +445,15 @@ export function LeekSign({ navigation }: LeekSignProps) {
         )}
         {phase.kind === 'linking' && link && (
           <LinkProgress link={link} status={status} translate={translate} />
+        )}
+        {phase.kind === 'mixnet' && (
+          <Text
+            variant="body"
+            testID="leek.sign.mixnet"
+            style={{ textAlign: 'center' }}
+          >
+            {translate('leek.mixnet-wait') as string}
+          </Text>
         )}
         {phase.kind === 'finishing' && (
           <Text variant="body" style={{ textAlign: 'center' }}>

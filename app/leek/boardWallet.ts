@@ -1,7 +1,4 @@
-import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Route } from '@app/AppState';
-import { navigateWallet } from '@app/navigation/navigate';
 
 /** A fragment size and frame interval for the animated code the board scans. */
 export type QrPreset = {
@@ -40,46 +37,28 @@ export const readMethod = async (): Promise<SignMethod> => {
 export const writeMethod = (method: SignMethod) =>
   AsyncStorage.setItem(METHOD_KEY, method);
 
-let boardWallet = false;
-const subscribers = new Set<() => void>();
+/** The QR page's screen brightness: the system's, or a fixed percentage. */
+export type QrBrightness = 'system' | 60 | 80 | 100;
 
-/** Marks the open wallet as one whose spends a LeekWallet board signs. */
-export const setBoardWallet = (board: boolean): void => {
-  boardWallet = board;
-  subscribers.forEach(notify => notify());
+export const QR_BRIGHTNESS: QrBrightness[] = ['system', 60, 80, 100];
+
+const BRIGHTNESS_KEY = 'leek.qr.brightness';
+
+export const nextBrightness = (current: QrBrightness): QrBrightness =>
+  QR_BRIGHTNESS[(QR_BRIGHTNESS.indexOf(current) + 1) % QR_BRIGHTNESS.length];
+
+export const readBrightness = async (): Promise<QrBrightness> => {
+  const key = await AsyncStorage.getItem(BRIGHTNESS_KEY);
+  return QR_BRIGHTNESS.find(level => String(level) === key) ?? 'system';
 };
 
-export const isBoardWallet = (): boolean => boardWallet;
+export const writeBrightness = (level: QrBrightness) =>
+  AsyncStorage.setItem(BRIGHTNESS_KEY, String(level));
 
-export const useBoardWallet = (): boolean =>
-  useSyncExternalStore(
-    notify => {
-      subscribers.add(notify);
-      return () => {
-        subscribers.delete(notify);
-      };
-    },
-    () => boardWallet,
-  );
-
-export type BoardSignature =
-  { kind: 'sent'; txids: string } | { kind: 'error'; message: string };
-
-let pending: ((signature: BoardSignature) => void) | undefined;
-
-/** Opens the board signing screen for the stored proposal and resolves the `{ txids }` JSON it broadcast. */
-export const requestBoardSignature = (): Promise<string> =>
-  new Promise((resolve, reject) => {
-    pending = signature =>
-      signature.kind === 'sent'
-        ? resolve(signature.txids)
-        : reject(new Error(signature.message));
-    navigateWallet({ screen: Route.LeekSign });
-  });
-
-/** Ends the request the signing screen serves. */
-export const settleBoardSignature = (signature: BoardSignature): void => {
-  const settle = pending;
-  pending = undefined;
-  settle?.(signature);
-};
+export {
+  isBoardWallet,
+  setBoardWallet,
+  settleBoardSignature,
+  useBoardWallet,
+} from './boardFlag';
+export type { BoardSignature } from './boardFlag';
