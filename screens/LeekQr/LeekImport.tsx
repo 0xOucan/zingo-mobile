@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { ScrollView, View, useWindowDimensions } from 'react-native';
 
 import { space12, space16, space20, space24, useTheme } from '@app/theme';
@@ -17,9 +17,18 @@ import Button from '@ui/primitives/Button';
 import TextField from '@ui/primitives/TextField';
 import TitleBar from '@ui/widgets/TitleBar';
 import { ChevronLeft } from '@ui/primitives/Icons/Chevron';
+import {
+  LeekLink,
+  linkAccount,
+  linkCancel,
+  linkConnect,
+  linkPermissions,
+} from '@app/leek/LeekLinkModule';
 import { UrCamera } from './components/UrCamera';
+import { LinkProgress, useLinkStatus } from './components/LinkProgress';
 
 type LeekImportProps = {
+  link: 'qr' | LeekLink;
   busy: boolean;
   onImport: (
     account: LeekAccount,
@@ -31,23 +40,68 @@ type LeekImportProps = {
 
 type Scan =
   | { kind: 'scanning'; progress?: QrProgress }
+  | { kind: 'linking' }
   | { kind: 'read'; record: LeekAccountRecord }
   | { kind: 'error'; message: string };
 
-/** Reads the board's View key QR (`ur:leek-zcash-accounts`) and imports its first account as a board-signed wallet. */
-export function LeekImport({ busy, onImport, onBack }: LeekImportProps) {
+const fromLink = (
+  seedFingerprint: string,
+  account: LeekAccount,
+): LeekAccountRecord => ({
+  seed_fingerprint: seedFingerprint,
+  accounts: [account],
+});
+
+/** Reads the board's first account over its View key QR, USB or Bluetooth and imports it as a board-signed wallet. */
+export function LeekImport({ link, busy, onImport, onBack }: LeekImportProps) {
   const { translate, server } = useContext(ContextAppLoading);
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
-  const [scan, setScan] = useState<Scan>({ kind: 'scanning' });
+  const [scan, setScan] = useState<Scan>({
+    kind: link === 'qr' ? 'scanning' : 'linking',
+  });
   const [attempt, setAttempt] = useState(0);
   const [birthday, setBirthday] = useState('');
+  const status = useLinkStatus(scan.kind === 'linking');
+  const deny = useRef('');
+  deny.current = translate('leek.link-permission') as string;
 
   useEffect(() => {
-    scanStart('account', server.chainName).catch((error: Error) =>
-      setScan({ kind: 'error', message: error.message }),
-    );
-  }, [server.chainName, attempt]);
+    if (link === 'qr') {
+      scanStart('account', server.chainName).catch((error: Error) =>
+        setScan({ kind: 'error', message: error.message }),
+      );
+      return;
+    }
+    let live = true;
+    (async () => {
+      if (!(await linkPermissions(link))) {
+        throw new Error(deny.current);
+      }
+      await linkConnect(link);
+      const account = await linkAccount(server.chainName);
+      if (live) {
+        setBirthday(account.birthday ? String(account.birthday) : '');
+        setScan({
+          kind: 'read',
+          record: fromLink(account.seed_fingerprint, {
+            ufvk: account.ufvk,
+            index: account.index,
+            name: '',
+            birthday: account.birthday,
+          }),
+        });
+      }
+    })().catch((error: Error) => {
+      if (live) {
+        setScan({ kind: 'error', message: error.message });
+      }
+    });
+    return () => {
+      live = false;
+      linkCancel().catch(() => undefined);
+    };
+  }, [link, server.chainName, attempt]);
 
   const onText = async (text: string) => {
     if (scan.kind !== 'scanning') {
@@ -69,14 +123,14 @@ export function LeekImport({ busy, onImport, onBack }: LeekImportProps) {
   const account = scan.kind === 'read' ? scan.record.accounts[0] : undefined;
   const height = Number(birthday);
   const restart = () => {
-    setScan({ kind: 'scanning' });
+    setScan({ kind: link === 'qr' ? 'scanning' : 'linking' });
     setAttempt(a => a + 1);
   };
 
   return (
     <View style={{ flex: 1 }}>
       <TitleBar
-        title={translate('leek.import-title') as string}
+        title={translate(`leek.import-title-${link}`) as string}
         left={{
           icon: ChevronLeft,
           onPress: onBack,
@@ -115,6 +169,9 @@ export function LeekImport({ busy, onImport, onBack }: LeekImportProps) {
             </Text>
           </>
         )}
+        {scan.kind === 'linking' && link !== 'qr' && (
+          <LinkProgress link={link} status={status} translate={translate} />
+        )}
         {scan.kind === 'error' && (
           <>
             <Text
@@ -126,7 +183,11 @@ export function LeekImport({ busy, onImport, onBack }: LeekImportProps) {
             <Button
               variant="secondary"
               testID="leek.import.retry"
-              title={translate('leek.scan-again') as string}
+              title={
+                translate(
+                  link === 'qr' ? 'leek.scan-again' : 'leek.link-again',
+                ) as string
+              }
               onPress={restart}
             />
           </>
@@ -175,7 +236,11 @@ export function LeekImport({ busy, onImport, onBack }: LeekImportProps) {
             <Button
               variant="text"
               testID="leek.import.rescan"
-              title={translate('leek.scan-again') as string}
+              title={
+                translate(
+                  link === 'qr' ? 'leek.scan-again' : 'leek.link-again',
+                ) as string
+              }
               disabled={busy}
               onPress={restart}
             />

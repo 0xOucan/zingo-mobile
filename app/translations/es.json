@@ -1600,8 +1600,6 @@
     "restart": "Reiniciar"
   },
   "leek": {
-    "import-title": "LeekWallet (QR)",
-    "import-entry": "Importar LeekWallet (QR)",
     "import-hint": "En la board: Main menu → View key. Apunta la cámara al código animado de la board.",
     "import-account": "Cuenta {index}",
     "import-fingerprint": "Huella de la seed {fp}…",
@@ -1617,6 +1615,31 @@
     "sign-close": "Cerrar",
     "preset-big": "Códigos grandes",
     "preset-medium": "40 B",
-    "preset-laptop": "50 B"
+    "preset-laptop": "50 B",
+    "import-title-qr": "LeekWallet (QR)",
+    "import-title-usb": "LeekWallet (USB)",
+    "import-title-ble": "LeekWallet (Bluetooth)",
+    "import-entry-qr": "Importar LeekWallet (QR)",
+    "import-entry-usb": "Importar LeekWallet (USB)",
+    "import-entry-ble": "Importar LeekWallet (Bluetooth)",
+    "method-qr": "QR",
+    "method-usb": "USB",
+    "method-ble": "Bluetooth",
+    "sign-oled-tip": "Cel con OLED: brillo al 100 %, prende el anti-flicker/DC dimming, exposure 0 en la board, Códigos grandes, board en 3x a unos 30 cm.",
+    "link-hint-usb": "Conecta el puerto USB de la board al cel con un cable USB-OTG.",
+    "link-hint-ble": "En la board: Settings → Link → Bluetooth.",
+    "link-sign": "Conectar y firmar",
+    "link-again": "Conectar otra vez",
+    "link-permission": "No se dio el permiso de Bluetooth.",
+    "link-connecting-usb": "Buscando la board por USB…",
+    "link-connecting-ble": "Buscando la board por Bluetooth…",
+    "link-pair": "Checa que la board muestre los mismos seis dígitos y luego aprieta ALLOW en la board.",
+    "link-unlock": "Desbloquea la board con su PIN.",
+    "link-connected": "Conectado a la board.",
+    "link-share": "En la board: Share view key? Aprieta OK.",
+    "link-checking": "Revisando la transacción…",
+    "link-uploading": "Mandando la transacción a la board: {sent} / {total} bytes",
+    "link-review": "Revisa la transacción en la board. Al aceptar la última página, firma.",
+    "link-applying": "Revisando las firmas de la board…"
   }
 }

@@ -26,6 +26,20 @@ export const readPreset = async (): Promise<QrPreset> => {
 export const writePreset = (preset: QrPreset) =>
   AsyncStorage.setItem(PRESET_KEY, preset.key);
 
+export type SignMethod = 'qr' | 'usb' | 'ble';
+
+export const SIGN_METHODS: SignMethod[] = ['qr', 'usb', 'ble'];
+
+const METHOD_KEY = 'leek.sign.method';
+
+export const readMethod = async (): Promise<SignMethod> => {
+  const key = await AsyncStorage.getItem(METHOD_KEY);
+  return SIGN_METHODS.find(method => method === key) ?? 'qr';
+};
+
+export const writeMethod = (method: SignMethod) =>
+  AsyncStorage.setItem(METHOD_KEY, method);
+
 let boardWallet = false;
 const subscribers = new Set<() => void>();
 

@@ -51,7 +51,7 @@ export type OnboardingParamList = {
   [Route.ServerList]: { chain: ChainNameEnum };
   [Route.Progress]: { kind: 'import' | 'create' };
   [Route.OpenError]: undefined;
-  [Route.LeekImport]: undefined;
+  [Route.LeekImport]: { link: 'qr' | 'usb' | 'ble' };
 };
 
 export type OnboardingRoute = keyof OnboardingParamList;

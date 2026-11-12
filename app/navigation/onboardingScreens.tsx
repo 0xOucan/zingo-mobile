@@ -190,17 +190,25 @@ export function ImportWalletScreen() {
       onClickCancel={goBack}
       onLeek={
         Platform.OS === 'android'
-          ? () => navigateOnboarding({ screen: Route.LeekImport })
+          ? link =>
+              navigateOnboarding({
+                screen: Route.LeekImport,
+                params: { link },
+              })
           : undefined
       }
     />
   );
 }
 
-export function LeekImportScreen() {
+export function LeekImportScreen({
+  route,
+}: OnboardingScreenProps<OnboardingParamList, 'LeekImport'>) {
   const { busy, doRestoreSigner } = useContext(ContextAppLoading);
   return (
     <LeekImport
+      key={route.params.link}
+      link={route.params.link}
       busy={busy}
       onImport={(account, seedFingerprint, birthday) =>
         doRestoreSigner(account.ufvk, birthday, {

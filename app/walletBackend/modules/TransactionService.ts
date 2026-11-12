@@ -94,10 +94,11 @@ export class TransactionService {
               sendError = proposeJSON.error;
             }
             if (!sendError) {
-              stored = false;
+              stored = isBoardWallet();
               const sendStr: string = isBoardWallet()
                 ? await requestBoardSignature()
                 : await RPCModule.confirmProcess();
+              stored = false;
               if (!sendStr) {
                 console.log('Internal Error confirm');
                 sendError = 'Error: Internal RPC Error: confirm';

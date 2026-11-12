@@ -38,6 +38,7 @@ type LeekQrAPI = {
   signFrames(start: number, count: number): Promise<string>;
   signFinish(): Promise<string>;
   signAbandon(): Promise<string>;
+  brightScreen(on: boolean): Promise<boolean>;
 };
 
 const LeekQr = NativeModules.LeekQrModule as LeekQrAPI;
@@ -66,3 +67,6 @@ export const signFrames = async (
 export const signFinish = () => LeekQr.signFinish();
 
 export const signAbandon = () => LeekQr.signAbandon();
+
+/** Sets the window to full brightness with the screen kept on, or restores both. */
+export const brightScreen = (on: boolean) => LeekQr.brightScreen(on);

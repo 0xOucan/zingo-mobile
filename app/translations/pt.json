@@ -1600,8 +1600,6 @@
     "restart": "Reiniciar"
   },
   "leek": {
-    "import-title": "LeekWallet (QR)",
-    "import-entry": "Import LeekWallet (QR)",
     "import-hint": "On the board: Main menu → View key. Point the camera at the board's animated code.",
     "import-account": "Account {index}",
     "import-fingerprint": "Seed fingerprint {fp}…",
@@ -1617,6 +1615,31 @@
     "sign-close": "Close",
     "preset-big": "Big codes",
     "preset-medium": "40 B",
-    "preset-laptop": "50 B"
+    "preset-laptop": "50 B",
+    "import-title-qr": "LeekWallet (QR)",
+    "import-title-usb": "LeekWallet (USB)",
+    "import-title-ble": "LeekWallet (Bluetooth)",
+    "import-entry-qr": "Import LeekWallet (QR)",
+    "import-entry-usb": "Import LeekWallet (USB)",
+    "import-entry-ble": "Import LeekWallet (Bluetooth)",
+    "method-qr": "QR",
+    "method-usb": "USB",
+    "method-ble": "Bluetooth",
+    "sign-oled-tip": "OLED phone: brightness 100 %, turn on anti-flicker/DC dimming, board exposure 0, Big codes, board at 3x about 30 cm away.",
+    "link-hint-usb": "Connect the board's USB port to the phone with a USB-OTG cable.",
+    "link-hint-ble": "On the board: Settings → Link → Bluetooth.",
+    "link-sign": "Connect and sign",
+    "link-again": "Connect again",
+    "link-permission": "Bluetooth permission was not granted.",
+    "link-connecting-usb": "Looking for the board on USB…",
+    "link-connecting-ble": "Looking for the board over Bluetooth…",
+    "link-pair": "Check that the board shows the same six digits, then press ALLOW on the board.",
+    "link-unlock": "Unlock the board with its PIN.",
+    "link-connected": "Connected to the board.",
+    "link-share": "On the board: Share view key? Press OK.",
+    "link-checking": "Checking the transaction…",
+    "link-uploading": "Sending the transaction to the board: {sent} / {total} bytes",
+    "link-review": "Review the transaction on the board. Accepting its last page signs.",
+    "link-applying": "Checking the board's signatures…"
   }
 }

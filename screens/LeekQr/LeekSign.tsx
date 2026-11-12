@@ -7,15 +7,21 @@ import { space8, space12, space16, space20, useTheme } from '@app/theme';
 import { ContextAppLoaded } from '@app/context';
 import { AppDrawerParamList } from '@app/types';
 import {
+  BoardSignature,
   QR_PRESETS,
   QrPreset,
+  SIGN_METHODS,
+  SignMethod,
+  readMethod,
   readPreset,
   settleBoardSignature,
+  writeMethod,
   writePreset,
 } from '@app/leek/boardWallet';
 import {
   QrFrameInfo,
   QrProgress,
+  brightScreen,
   scanFeed,
   scanStart,
   signAbandon,
@@ -24,11 +30,19 @@ import {
   signFrames,
   signStart,
 } from '@app/leek/LeekQrModule';
+import {
+  LeekLink,
+  linkCancel,
+  linkConnect,
+  linkPermissions,
+  linkSign,
+} from '@app/leek/LeekLinkModule';
 import Text from '@ui/primitives/Text';
 import Button from '@ui/primitives/Button';
 import SegmentedSwitch from '@ui/widgets/SegmentedSwitch';
 import { UrFrames } from './components/UrFrames';
 import { UrCamera } from './components/UrCamera';
+import { LinkProgress, useLinkStatus } from './components/LinkProgress';
 
 type LeekSignProps = NativeStackScreenProps<AppDrawerParamList, 'LeekSign'>;
 
@@ -37,6 +51,8 @@ type Phase =
   | { kind: 'show'; frames: string[] }
   | { kind: 'scan'; progress?: QrProgress }
   | { kind: 'finishing' }
+  | { kind: 'linkReady'; message?: string }
+  | { kind: 'linking' }
   | { kind: 'failed'; message: string };
 
 const MAX_FRAMES = 255;
@@ -45,47 +61,108 @@ const MIN_FRAMES = 20;
 const framesFor = (info: QrFrameInfo) =>
   signFrames(0, Math.min(MAX_FRAMES, Math.max(MIN_FRAMES, info.seq_len * 4)));
 
-/** Shows the stored proposal to a LeekWallet board as an animated `ur:leek-pczt`, then reads its `ur:leek-zsig` reply and broadcasts. */
+/** Signs the stored proposal on a LeekWallet board over animated QR codes, USB or Bluetooth, then broadcasts. */
 export function LeekSign({ navigation }: LeekSignProps) {
   const { translate, server } = useContext(ContextAppLoaded);
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const [phase, setPhase] = useState<Phase>({ kind: 'building' });
   const [preset, setPreset] = useState<QrPreset>(QR_PRESETS[0]);
+  const [method, setMethod] = useState<SignMethod>('qr');
   const settled = useRef(false);
   const finishing = useRef(false);
+  const qrBuilt = useRef(false);
+  const holding = useRef(false);
+  const status = useLinkStatus(phase.kind === 'linking');
+  const deny = useRef('');
+  deny.current = translate('leek.link-permission') as string;
 
-  const fail = (message: string) => {
+  holding.current =
+    phase.kind === 'finishing' ||
+    (phase.kind === 'linking' &&
+      (status.stage === 'proving' || status.stage === 'sending'));
+
+  const settle = (signature: BoardSignature) => {
     if (!settled.current) {
       settled.current = true;
-      settleBoardSignature({ kind: 'error', message });
+      settleBoardSignature(signature);
     }
+  };
+
+  const fail = (message: string) => {
+    settle({ kind: 'error', message });
     setPhase({ kind: 'failed', message });
   };
 
+  const sent = (txids: string) => {
+    settle({ kind: 'sent', txids });
+    holding.current = false;
+    navigation.goBack();
+  };
+
+  const showQr = async (next: QrPreset) => {
+    setPhase({ kind: 'building' });
+    const info = qrBuilt.current
+      ? await signFragment(next.fragmentLen)
+      : await signStart(next.fragmentLen);
+    qrBuilt.current = true;
+    setPhase({ kind: 'show', frames: await framesFor(info) });
+  };
+
   useEffect(() => {
-    let live = true;
     (async () => {
-      const saved = await readPreset();
+      const [saved, chosen] = await Promise.all([readPreset(), readMethod()]);
       setPreset(saved);
-      const frames = await framesFor(await signStart(saved.fragmentLen));
-      if (live) {
-        setPhase({ kind: 'show', frames });
+      setMethod(chosen);
+      if (chosen === 'qr') {
+        await showQr(saved);
+      } else {
+        setPhase({ kind: 'linkReady' });
       }
     })().catch((error: Error) => fail(error.message));
     return () => {
-      live = false;
+      linkCancel().catch(() => undefined);
       if (!finishing.current) {
         signAbandon().catch(() => undefined);
       }
-      if (!settled.current) {
-        settled.current = true;
-        settleBoardSignature({ kind: 'error', message: 'cancelled' });
-      }
+      settle({ kind: 'error', message: 'cancelled' });
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const choose = async (key: QrPreset['key']) => {
+  useEffect(
+    () =>
+      navigation.addListener('beforeRemove', event => {
+        if (holding.current) {
+          event.preventDefault();
+        }
+      }),
+    [navigation],
+  );
+
+  const showing = phase.kind === 'show';
+
+  useEffect(() => {
+    if (!showing) {
+      return;
+    }
+    brightScreen(true).catch(() => undefined);
+    return () => {
+      brightScreen(false).catch(() => undefined);
+    };
+  }, [showing]);
+
+  const chooseMethod = async (next: SignMethod) => {
+    setMethod(next);
+    await writeMethod(next);
+    if (next === 'qr') {
+      await showQr(preset);
+    } else {
+      setPhase({ kind: 'linkReady' });
+    }
+  };
+
+  const choosePreset = async (key: QrPreset['key']) => {
     const next = QR_PRESETS.find(p => p.key === key) ?? QR_PRESETS[0];
     setPreset(next);
     await writePreset(next);
@@ -94,6 +171,24 @@ export function LeekSign({ navigation }: LeekSignProps) {
         kind: 'show',
         frames: await framesFor(await signFragment(next.fragmentLen)),
       });
+    }
+  };
+
+  const signOver = async (link: LeekLink) => {
+    if (!(await linkPermissions(link))) {
+      setPhase({ kind: 'linkReady', message: deny.current });
+      return;
+    }
+    setPhase({ kind: 'linking' });
+    const connected = await linkConnect(link).then(
+      () => true,
+      (error: Error) => {
+        setPhase({ kind: 'linkReady', message: error.message });
+        return false;
+      },
+    );
+    if (connected) {
+      sent(await linkSign());
     }
   };
 
@@ -114,23 +209,19 @@ export function LeekSign({ navigation }: LeekSignProps) {
     } else if (progress.state === 'complete' && !finishing.current) {
       finishing.current = true;
       setPhase({ kind: 'finishing' });
-      const txids = await signFinish();
-      settled.current = true;
-      settleBoardSignature({ kind: 'sent', txids });
-      navigation.goBack();
+      sent(await signFinish());
     }
   };
 
   const cancel = async () => {
+    await linkCancel().catch(() => undefined);
     await signAbandon().catch(() => undefined);
-    if (!settled.current) {
-      settled.current = true;
-      settleBoardSignature({ kind: 'error', message: 'cancelled' });
-    }
+    settle({ kind: 'error', message: 'cancelled' });
     navigation.goBack();
   };
 
-  const showing = phase.kind === 'show';
+  const switchable = showing || phase.kind === 'linkReady';
+  const link = method === 'qr' ? undefined : method;
 
   return (
     <View
@@ -148,6 +239,21 @@ export function LeekSign({ navigation }: LeekSignProps) {
           alignItems: 'center',
         }}
       >
+        {switchable && (
+          <SegmentedSwitch
+            testID="leek.sign.method"
+            options={SIGN_METHODS.map(m => ({
+              key: m,
+              label: translate(`leek.method-${m}`) as string,
+              testID: `leek.sign.method.${m}`,
+            }))}
+            value={method}
+            onChange={next => {
+              chooseMethod(next).catch((error: Error) => fail(error.message));
+            }}
+            style={{ alignSelf: 'stretch' }}
+          />
+        )}
         {phase.kind === 'building' && (
           <Text variant="body">
             {translate('leek.sign-building') as string}
@@ -166,6 +272,13 @@ export function LeekSign({ navigation }: LeekSignProps) {
             >
               {translate('leek.sign-show-hint') as string}
             </Text>
+            <Text
+              variant="caption"
+              testID="leek.sign.tip"
+              style={{ color: colors.bgQrPaper, textAlign: 'center' }}
+            >
+              {translate('leek.sign-oled-tip') as string}
+            </Text>
             <SegmentedSwitch
               testID="leek.sign.preset"
               options={QR_PRESETS.map(p => ({
@@ -175,7 +288,7 @@ export function LeekSign({ navigation }: LeekSignProps) {
               }))}
               value={preset.key}
               onChange={key => {
-                choose(key).catch((error: Error) => fail(error.message));
+                choosePreset(key).catch((error: Error) => fail(error.message));
               }}
               style={{ alignSelf: 'stretch' }}
             />
@@ -209,6 +322,34 @@ export function LeekSign({ navigation }: LeekSignProps) {
             </Text>
           </>
         )}
+        {phase.kind === 'linkReady' && link && (
+          <>
+            <Text variant="body" style={{ textAlign: 'center' }}>
+              {translate(`leek.link-hint-${link}`) as string}
+            </Text>
+            {phase.message && (
+              <Text
+                variant="body"
+                testID="leek.sign.link-error"
+                style={{ color: colors.fgDanger, textAlign: 'center' }}
+              >
+                {phase.message}
+              </Text>
+            )}
+            <Button
+              variant="primary"
+              testID="leek.sign.connect"
+              title={translate('leek.link-sign') as string}
+              onPress={() => {
+                signOver(link).catch((error: Error) => fail(error.message));
+              }}
+              style={{ alignSelf: 'stretch' }}
+            />
+          </>
+        )}
+        {phase.kind === 'linking' && link && (
+          <LinkProgress link={link} status={status} translate={translate} />
+        )}
         {phase.kind === 'finishing' && (
           <Text variant="body" style={{ textAlign: 'center' }}>
             {translate('leek.sign-finishing') as string}
@@ -223,7 +364,7 @@ export function LeekSign({ navigation }: LeekSignProps) {
             {phase.message}
           </Text>
         )}
-        {phase.kind !== 'finishing' && (
+        {phase.kind !== 'finishing' && !holding.current && (
           <View style={{ alignSelf: 'stretch', marginTop: space8 }}>
             <Button
               variant="quiet"

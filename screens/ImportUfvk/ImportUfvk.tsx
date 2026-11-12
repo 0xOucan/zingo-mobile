@@ -51,7 +51,7 @@ type ImportUfvkProps = {
   busy: boolean;
   onClickCancel: () => void;
   onClickOK: (keyText: string, birthday: number) => void;
-  onLeek?: () => void;
+  onLeek?: (link: 'qr' | 'usb' | 'ble') => void;
 };
 // Waits for typing to pause before decoding the key.
 const KEY_CHECK_DELAY_MS = 300;
@@ -372,13 +372,16 @@ const ImportUfvk: React.FunctionComponent<ImportUfvkProps> = ({
           </View>
           {onLeek && (
             <View style={{ marginTop: space12 }}>
-              <Button
-                variant="text"
-                testID="import.leek"
-                title={translate('leek.import-entry') as string}
-                disabled={busy}
-                onPress={onLeek}
-              />
+              {(['qr', 'usb', 'ble'] as const).map(link => (
+                <Button
+                  key={link}
+                  variant="text"
+                  testID={`import.leek.${link}`}
+                  title={translate(`leek.import-entry-${link}`) as string}
+                  disabled={busy}
+                  onPress={() => onLeek(link)}
+                />
+              ))}
             </View>
           )}
         </View>
