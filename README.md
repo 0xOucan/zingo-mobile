@@ -6,6 +6,144 @@ App Store: [https://apps.apple.com/app/zingo/id1668209531](https://apps.apple.co
 
 Google Play: [https://play.google.com/store/apps/details?id=org.ZingoLabs.Zingo](https://play.google.com/store/apps/details?id=org.ZingoLabs.Zingo)
 
+## LeekWallet hardware signer (this fork)
+
+The `leekwallet-qr` branch of this fork adds the LeekWallet board as a signer
+for Zingo on Android. LeekWallet is a DIY Zcash hardware signer on an ESP32-S3
+([zcash.leekwallet.xyz](https://zcash.leekwallet.xyz),
+[0xOucan/leekwallet-zcash](https://github.com/0xOucan/leekwallet-zcash)). The
+board holds the seed, shows the transaction and returns the spend-auth
+signatures. Zingo builds the PCZT, proves it and broadcasts the transaction.
+
+The branch is offered to the Zingo team for review. It is a fork, and Zingo
+Labs has not released it.
+
+### Whose code
+
+The external-signer wallet and the PCZT steps are Zingo Labs' work: Dorian's
+draft [zingolib PR #3147](https://github.com/zingolabs/zingolib/pull/3147)
+(head `abf25aff`), used unmodified. It provides `init_from_ufvk_with_derivation`,
+`pczt_from_stored_proposal`, `pczt_prove`, `pczt_finish_and_store`,
+`pczt_abandon` and `transmit_calculated`. The rest of zingo-mobile is Zingo
+Labs' code under MIT.
+
+Our part is the commits on top of zingo-mobile `d8a6040f5`, with backend and
+UI in separate commits:
+
+| Commit | Side | Change |
+|---|---|---|
+| `3858fdacd` | build | a local zingolib Binding Layer and the LeekWallet SDK |
+| `ac0dd3594` | backend | `LeekQrModule.kt`, `LeekSigner.kt`: QR signing and the signer derivation |
+| `6675f28c7` | UI | import and sign over QR |
+| `109446cfe` | backend | `LeekUsbLink.kt`, `LeekBleLink.kt`, `LeekLinkModule.kt`: USB and Bluetooth |
+| `8019574a9` | UI | import and sign over USB and Bluetooth |
+| `df5701432` | backend | the mixnet wait before broadcast, the address check on the board |
+| `943b6785d` | UI | the mixnet wait, Verify on LeekWallet, QR brightness |
+| `397a5f67c` | UI | the QR screens lose the "Experimental" caption |
+
+`LeekUsbLink.kt` and `LeekBleLink.kt` were adapted from our Zodl fork (MIT).
+Each file names its origin at the top.
+
+### The LeekWallet SDK
+
+The app calls the SDK's `leek-zcash-ffi` (Apache-2.0) through its Kotlin
+bindings, package `io.leekwallet.zcash.sdk`:
+
+- `FrameTransport` over USB (the board's ESP32-S3 USB Serial/JTAG) and over
+  Bluetooth LE (the board's GATT service). `LeekDevice.pair` shows a six-digit
+  code on the phone and on the board at every connection. The app stores no
+  pairing.
+- `signPczt(…, SignerView.COMPACT, verifyAccount = true)` runs the preflight,
+  uploads the signer view, waits for the review on the board and verifies
+  every returned signature before Zingo proves.
+- `QrEncoder` and `QrScanner` carry the animated `ur:leek-pczt` and
+  `ur:leek-zsig` codes. `applyZsig` verifies the board's signatures.
+- `showAddress` makes the board page a Zingo receive address and confirm that
+  it belongs to the account.
+
+The View key import uses `QrScanner` on the board's account record, or
+`getAccount` over USB and Bluetooth after the board asks "Share view key?".
+zingolib's FFI has no getter for the stored derivation. `LeekSigner.kt` keeps
+the seed fingerprint, account index, UFVK and network in an `EncryptedFile`
+(`wallet.leek.json`), deleted with the wallet.
+
+### Tested
+
+The owner tested the branch on testnet, on a phone with the board, on
+2026-11-11 and 2026-11-12. USB, Bluetooth and QR signing all worked.
+
+- Import of the View key over USB, Bluetooth and QR.
+- Signing over USB, Bluetooth and QR.
+- Verify on LeekWallet, with the board showing the address.
+- The wait for the mixnet before the broadcast.
+- The QR brightness button (system, 60 %, 80 %, 100 %).
+
+Checks on `397a5f67c`, re-run on 2026-11-12: `yarn typecheck`,
+`yarn lint:check` (0 errors, 14 warnings from upstream), `yarn prettier:check`
+and `jest` (287 suites, 2112 tests, 67 snapshots passed). The Kotlin modules have no JVM tests.
+
+### Build (Android)
+
+The build needs NDK 28.2.13676358, CMake 3.22.1, `ccache` on `PATH`, Node
+24.22.0 and `yarn install --frozen-lockfile`. Clone
+[0xOucan/zingolib `leekwallet-signer`](https://github.com/0xOucan/zingolib/tree/leekwallet-signer)
+next to this checkout and a clone of `leekwallet-zcash` two levels above it
+(zingo-cli has path dependencies on `../../../leekwallet-zcash`).
+
+Build zingolib's Binding Layer in zingolib's CI image, then its AAR:
+
+```sh
+cd ../zingolib
+docker run --rm -v "$PWD":/zingolib \
+  -v <leekwallet-zcash>:/leekwallet-zcash:ro \
+  -v zingolib-cargo-registry:/root/.cargo/registry -w /zingolib \
+  ghcr.io/zingolabs/android_builder:019 sh -c 'git config --global --add safe.directory /zingolib &&
+    cargo run --manifest-path tools/workbench/Cargo.toml --bin build-binding-layer -- \
+      android --in-image --abi arm64-v8a --out bindings/android/build/binding-layer'
+../zingo-mobile/android/gradlew -p bindings/android \
+  -PbindingLayerPrebuilt=$PWD/bindings/android/build/binding-layer \
+  -PbindingLayerVersion=8.0.0-leek-f1add3152 publish
+```
+
+Build the SDK library and its Kotlin bindings, then the APK:
+
+```sh
+LEEK_SDK_HOST=<leekwallet-zcash>/host scripts/leek_sdk_android.sh
+cd android && ./gradlew assembleProdDebug -PreactNativeArchitectures=arm64-v8a \
+  -PbundleDebugJs=true \
+  -PbindingLayerLocalRepository=<zingolib>/bindings/android/build/repository \
+  -PbindingLayerLocalVersion=8.0.0-leek-f1add3152
+```
+
+`leek_sdk_android.sh` builds `libleek_zcash_ffi.so` for arm64-v8a and refuses
+if the regenerated bindings differ from the SDK's committed ones. The APK keeps
+the package name `org.ZingoLabs.Zingo` and the debug keystore. Uninstall the
+store Zingo first.
+
+### Known limits
+
+- Android only. The entry is hidden on iOS, which has no Swift bridge.
+- Untested on mainnet.
+- The signer view is always COMPACT, with no setting.
+- A broadcast that fails after `pczt_finish_and_store` leaves the transaction
+  Calculated ("Prepared") with its inputs spent until it expires. Zingo's
+  rebroadcast logic was not checked for Calculated transactions.
+- A Cancel pressed while the PCZT is still being built can leave a session
+  behind until the next send or an app restart.
+- Zingo's send retry on another server proposes again and asks the board
+  again.
+- Shield and Swap are hidden for the board wallet.
+- LeekSign, LeekImport and LeekVerify use existing tokens and components, and
+  nobody has reviewed them against `DESIGN.md`.
+- The SDK comes in as a build directory. Upstream would want an AAR.
+
+### AI use
+
+Per zingolib's `AI_POLICY.md`: the commits on this branch, the Kotlin and
+TypeScript code and this section were written with Claude Code (Claude Opus
+5.5), with 0xOucan directing the work. 0xOucan ran the board tests and answers
+for the code.
+
 # Security Vulnerability Disclosure
 
 If you believe you have discovered a security issue, please contact us at:
