@@ -362,12 +362,6 @@ export function LeekSign({ navigation }: LeekSignProps) {
             >
               {translate('leek.sign-oled-tip') as string}
             </Text>
-            <Text
-              variant="caption"
-              style={{ color: colors.bgQrPaper, textAlign: 'center' }}
-            >
-              {translate('leek.experimental') as string}
-            </Text>
             <Button
               variant="secondary"
               testID="leek.sign.brightness"

@@ -1650,7 +1650,6 @@
     "mixnet-prepared": "La transacción firmada no se mandó. Se queda en el Historial como Preparada hasta que expire (unos 40 bloques) y luego sale como Fallida.",
     "verify-title": "Checar dirección en la LeekWallet",
     "verify-qr-hint": "En la board: Main menu → Check address y luego escanea este código.",
-    "experimental": "Experimental",
     "link-verify": "Conectar y checar",
     "link-address": "Compara la dirección de la board con la de esta pantalla y luego confirma en la board.",
     "verify-verified": "La board sacó esta dirección de sus llaves y confirmaste que coincide.",

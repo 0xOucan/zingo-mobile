@@ -1650,7 +1650,6 @@
     "mixnet-prepared": "The signed transaction was not sent. It stays in History as Prepared until it expires (about 40 blocks), then shows as Failed.",
     "verify-title": "Check address on LeekWallet",
     "verify-qr-hint": "On the board: Main menu → Check address, then scan this code.",
-    "experimental": "Experimental",
     "link-verify": "Connect and check",
     "link-address": "Compare the address on the board with the one on this screen, then confirm on the board.",
     "verify-verified": "The board derived this address, and you confirmed that it matches.",

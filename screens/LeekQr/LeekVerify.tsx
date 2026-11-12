@@ -148,12 +148,6 @@ export function LeekVerify({ navigation, route }: LeekVerifyProps) {
             >
               {t('leek.verify-qr-hint')}
             </Text>
-            <Text
-              variant="caption"
-              style={{ color: colors.bgQrPaper, textAlign: 'center' }}
-            >
-              {t('leek.experimental')}
-            </Text>
             <Button
               variant="secondary"
               testID="leek.verify.brightness"
