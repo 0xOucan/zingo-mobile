@@ -20,6 +20,7 @@ class RPCPackage : ReactPackage {
         modules.add(ScreenSecurityModule(reactContext))
         modules.add(PrivacyGuardModule(reactContext))
         modules.add(LeekQrModule(reactContext))
+        modules.add(LeekLinkModule(reactContext))
         return modules
     }
 }

@@ -1,19 +1,15 @@
 package org.ZingoLabs.Zingo
 
+import android.view.WindowManager
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
-import io.leekwallet.zcash.sdk.LeekException
 import io.leekwallet.zcash.sdk.QrEncoder
 import io.leekwallet.zcash.sdk.QrProgress
 import io.leekwallet.zcash.sdk.QrScanKind
 import io.leekwallet.zcash.sdk.QrScanner
 import io.leekwallet.zcash.sdk.SignerView
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -28,46 +24,7 @@ class LeekQrModule(reactContext: ReactApplicationContext) : ReactContextBaseJava
 
     override fun getName(): String = "LeekQrModule"
 
-    private fun settling(promise: Promise, call: () -> Any?) {
-        CoroutineScope(Dispatchers.IO).launch {
-            val outcome = try {
-                Result.success(call())
-            } catch (e: Exception) {
-                Result.failure(e)
-            }
-            withContext(Dispatchers.Main) {
-                outcome.fold(
-                    { promise.resolve(it) },
-                    { promise.reject(codeOf(it), reasonOf(it), it) },
-                )
-            }
-        }
-    }
-
-    private fun codeOf(error: Throwable): String = when (error) {
-        is LeekException.Link -> "Leek${error.code}"
-        is LeekException.Session -> "Leek${error.code}"
-        is LeekException.User -> "Leek${error.code}"
-        is LeekException.Account -> "Leek${error.code}"
-        is LeekException.Pczt -> "Leek${error.code}"
-        is LeekException.Signature -> "Leek${error.code}"
-        is LeekException.Storage -> "Leek${error.code}"
-        is LeekException.Device -> "Leek${error.code}"
-        is uniffi.zingo.ZingolibException -> error.javaClass.simpleName
-        else -> "Unknown"
-    }
-
-    private fun reasonOf(error: Throwable): String = when (error) {
-        is LeekException.Link -> error.reason
-        is LeekException.Session -> error.reason
-        is LeekException.User -> error.reason
-        is LeekException.Account -> error.reason
-        is LeekException.Pczt -> error.reason
-        is LeekException.Signature -> error.reason
-        is LeekException.Storage -> error.reason
-        is LeekException.Device -> error.reason
-        else -> error.message ?: error.javaClass.simpleName
-    }
+    private fun settling(promise: Promise, call: () -> Any?) = settleLeek(promise, call)
 
     private fun progressJson(progress: QrProgress): String = JSONObject()
         .put("state", progress.state.name.lowercase())
@@ -207,6 +164,47 @@ class LeekQrModule(reactContext: ReactApplicationContext) : ReactContextBaseJava
             val sent = uniffi.zingo.transmitCalculated(List(txids.length()) { txids.getString(it) })
             saveWallet()
             sent
+        }
+    }
+
+    /** Hands the built signing request to another link and ends the QR session. */
+    internal fun takePrepared(): Pair<LeekSigner, ByteArray>? =
+        synchronized(lock) { session?.also { session = null } }?.let { it.signer to it.prepared }
+
+    private var savedBrightness: Float? = null
+    private var addedKeepOn = false
+
+    /** Sets the window to full brightness with the screen kept on, or restores both. */
+    @ReactMethod
+    fun brightScreen(on: Boolean, promise: Promise) {
+        val activity = reactApplicationContext.currentActivity
+        if (activity == null) {
+            promise.resolve(false)
+            return
+        }
+        activity.runOnUiThread {
+            val window = activity.window
+            val attrs = window.attributes
+            if (on) {
+                if (savedBrightness == null) {
+                    savedBrightness = attrs.screenBrightness
+                    addedKeepOn = attrs.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON == 0
+                }
+                attrs.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_FULL
+                window.attributes = attrs
+                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            } else {
+                savedBrightness?.let {
+                    attrs.screenBrightness = it
+                    window.attributes = attrs
+                }
+                if (addedKeepOn) {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+                savedBrightness = null
+                addedKeepOn = false
+            }
+            promise.resolve(true)
         }
     }
 
